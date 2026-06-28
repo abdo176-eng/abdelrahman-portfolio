@@ -4,150 +4,137 @@ import {
   X, LogOut, Mail, CheckCircle, Trash2, Eye, EyeOff,
   Lock, User, LayoutDashboard, MessageSquare, Clock,
   ChevronDown, ChevronUp, Settings, Save, KeyRound, ShieldCheck,
+  FolderOpen, Plus, Pencil, Star, ThumbsUp, Globe2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { useLanguage } from "@/contexts/LanguageContext";
+import {
+  getProjects, saveProject, updateProject, deleteProject, type Project,
+  getReviews, approveReview, deleteReview, type Review,
+} from "@/lib/store";
 
-/* ─── Storage keys ─── */
+/* ─── Admin-specific localStorage keys ─── */
 const SESSION_KEY  = "admin_session";
 const MESSAGES_KEY = "contact_messages";
 const SETTINGS_KEY = "admin_settings";
 
-/* ─── Default settings ─── */
-interface AdminSettings {
-  username: string;
-  password: string;
-  shortcutKey: string; // single digit/char, used with Ctrl+Shift
-}
-
-const DEFAULT_SETTINGS: AdminSettings = {
-  username:    "admin",
-  password:    "Abdo1662006",
-  shortcutKey: "6",
-};
+interface AdminSettings { username: string; password: string; shortcutKey: string; }
+const DEFAULT: AdminSettings = { username: "admin", password: "Abdo1662006", shortcutKey: "6" };
 
 export function getAdminSettings(): AdminSettings {
-  try {
-    return { ...DEFAULT_SETTINGS, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}") };
-  } catch {
-    return DEFAULT_SETTINGS;
-  }
+  try { return { ...DEFAULT, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}") }; }
+  catch { return DEFAULT; }
 }
+function persistSettings(s: AdminSettings) { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); }
 
-function saveSettings(s: AdminSettings) {
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
-}
-
-/* ─── Messages helpers ─── */
 export interface ContactMessage {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  projectType: string;
-  message: string;
-  timestamp: string;
-  read: boolean;
+  id: string; name: string; email: string; phone: string;
+  projectType: string; message: string; timestamp: string; read: boolean;
 }
-
 export function saveMessage(msg: Omit<ContactMessage, "id" | "timestamp" | "read">) {
-  const existing: ContactMessage[] = JSON.parse(localStorage.getItem(MESSAGES_KEY) || "[]");
-  const newMsg: ContactMessage = {
-    ...msg,
-    id: Date.now().toString(),
-    timestamp: new Date().toISOString(),
-    read: false,
-  };
-  localStorage.setItem(MESSAGES_KEY, JSON.stringify([newMsg, ...existing]));
+  const list: ContactMessage[] = JSON.parse(localStorage.getItem(MESSAGES_KEY) || "[]");
+  const newMsg: ContactMessage = { ...msg, id: Date.now().toString(), timestamp: new Date().toISOString(), read: false };
+  localStorage.setItem(MESSAGES_KEY, JSON.stringify([newMsg, ...list]));
 }
 
-function getMessages(): ContactMessage[] {
-  return JSON.parse(localStorage.getItem(MESSAGES_KEY) || "[]");
-}
-
-function markRead(id: string) {
-  const msgs = getMessages().map(m => m.id === id ? { ...m, read: true } : m);
-  localStorage.setItem(MESSAGES_KEY, JSON.stringify(msgs));
-}
-
-function deleteMsg(id: string) {
-  const msgs = getMessages().filter(m => m.id !== id);
-  localStorage.setItem(MESSAGES_KEY, JSON.stringify(msgs));
-}
-
-const PROJECT_LABELS: Record<string, string> = {
-  company: "Company Website", ecommerce: "E-Commerce",
-  landing: "Landing Page", other: "Other",
+const GRADIENTS = [
+  { label: "Blue → Teal",    value: "from-blue-500/20 to-teal-500/20" },
+  { label: "Purple → Blue",  value: "from-purple-500/20 to-blue-500/20" },
+  { label: "Teal → Green",   value: "from-teal-500/20 to-green-500/20" },
+  { label: "Orange → Red",   value: "from-orange-500/20 to-red-500/20" },
+  { label: "Pink → Purple",  value: "from-pink-500/20 to-purple-500/20" },
+  { label: "Indigo → Cyan",  value: "from-indigo-500/20 to-cyan-500/20" },
+];
+const PROJECT_TYPE_LABELS: Record<string, { en: string; ar: string }> = {
+  company:   { en: "Company Website",  ar: "موقع شركة" },
+  ecommerce: { en: "E-Commerce",        ar: "متجر إلكتروني" },
+  landing:   { en: "Landing Page",      ar: "صفحة هبوط" },
+  other:     { en: "Other",             ar: "أخرى" },
 };
 
-/* ═══════════════════════════════════════════
-   LOGIN FORM
-═══════════════════════════════════════════ */
+/* ════════════════════════════════════════════════════════
+   HELPERS
+════════════════════════════════════════════════════════ */
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return <label className="text-sm font-medium text-foreground">{children}</label>;
+}
+function FormRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return <div className="space-y-1.5"><FieldLabel>{label}</FieldLabel>{children}</div>;
+}
+function StarRow({ value }: { value: number }) {
+  return (
+    <div className="flex gap-0.5">
+      {[1,2,3,4,5].map(s => (
+        <Star key={s} className={`h-4 w-4 ${s <= value ? "fill-secondary text-secondary" : "text-muted-foreground/30"}`} />
+      ))}
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════
+   LOGIN
+════════════════════════════════════════════════════════ */
 function LoginForm({ onLogin }: { onLogin: () => void }) {
+  const { t } = useLanguage();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [showPass, setShowPass]  = useState(false);
-  const [error, setError]        = useState("");
-  const [loading, setLoading]    = useState(false);
+  const [showPass, setShowPass] = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true);
-    setError("");
+    setLoading(true); setError("");
     setTimeout(() => {
       const s = getAdminSettings();
       if (username === s.username && password === s.password) {
-        sessionStorage.setItem(SESSION_KEY, "1");
-        onLogin();
+        sessionStorage.setItem(SESSION_KEY, "1"); onLogin();
       } else {
-        setError("Invalid username or password.");
+        setError(t("Invalid username or password.", "اسم المستخدم أو كلمة المرور غير صحيحة."));
       }
       setLoading(false);
     }, 500);
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      className="flex items-center justify-center w-full h-full"
-    >
+    <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+      className="flex items-center justify-center w-full h-full">
       <Card className="w-full max-w-sm border-border bg-card shadow-2xl">
         <CardHeader className="text-center pb-2">
           <div className="mx-auto mb-4 h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center">
             <Lock className="h-7 w-7 text-primary" />
           </div>
-          <CardTitle className="text-2xl font-bold">Admin Panel</CardTitle>
-          <p className="text-sm text-muted-foreground mt-1">Sign in to manage your portfolio</p>
+          <CardTitle className="text-2xl font-bold">{t("Admin Panel", "لوحة التحكم")}</CardTitle>
+          <p className="text-sm text-muted-foreground mt-1">{t("Sign in to manage your portfolio", "سجل دخولك لإدارة بورتفوليوك")}</p>
         </CardHeader>
         <CardContent className="pt-4">
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground">Username</label>
+            <FormRow label={t("Username", "اسم المستخدم")}>
               <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input data-testid="input-admin-username" className="pl-10" placeholder="admin"
-                  value={username} onChange={e => setUsername(e.target.value)} autoComplete="username" required />
+                <User className="absolute left-3 rtl:right-3 rtl:left-auto top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input className="pl-10 rtl:pr-10 rtl:pl-3" placeholder="admin"
+                  value={username} onChange={e => setUsername(e.target.value)} required />
               </div>
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground">Password</label>
+            </FormRow>
+            <FormRow label={t("Password", "كلمة المرور")}>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input data-testid="input-admin-password" className="pl-10 pr-10"
-                  type={showPass ? "text" : "password"} placeholder="••••••••"
-                  value={password} onChange={e => setPassword(e.target.value)} autoComplete="current-password" required />
+                <Lock className="absolute left-3 rtl:right-3 rtl:left-auto top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input className="pl-10 rtl:pr-10 rtl:pl-3 pr-10" type={showPass ? "text" : "password"}
+                  placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required />
                 <button type="button" onClick={() => setShowPass(v => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
+                  className="absolute right-3 rtl:left-3 rtl:right-auto top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
                   {showPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
-            </div>
-            {error && <p className="text-sm text-destructive font-medium">{error}</p>}
-            <Button data-testid="button-admin-login" type="submit" className="w-full" disabled={loading}>
-              {loading ? "Signing in…" : "Sign In"}
+            </FormRow>
+            {error && <p className="text-sm text-destructive">{error}</p>}
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? t("Signing in…", "جاري تسجيل الدخول…") : t("Sign In", "دخول")}
             </Button>
           </form>
         </CardContent>
@@ -156,116 +143,64 @@ function LoginForm({ onLogin }: { onLogin: () => void }) {
   );
 }
 
-/* ═══════════════════════════════════════════
-   MESSAGE CARD
-═══════════════════════════════════════════ */
-function MessageCard({ msg, onRefresh }: { msg: ContactMessage; onRefresh: () => void }) {
-  const [expanded, setExpanded] = useState(false);
-
-  const date = new Date(msg.timestamp).toLocaleDateString("en-US", {
-    year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
-  });
-
-  return (
-    <motion.div layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: -20 }}
-      className={`rounded-xl border ${msg.read ? "border-border bg-card/50" : "border-primary/40 bg-primary/5"} p-4 transition-colors`}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-semibold text-foreground">{msg.name}</span>
-            {!msg.read && <Badge className="bg-primary text-primary-foreground text-xs px-2 py-0">New</Badge>}
-            <Badge variant="outline" className="text-xs px-2 py-0">{PROJECT_LABELS[msg.projectType] || msg.projectType}</Badge>
-          </div>
-          <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground flex-wrap">
-            <span className="flex items-center gap-1"><Mail className="h-3 w-3" />{msg.email}</span>
-            <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{date}</span>
-          </div>
-        </div>
-        <div className="flex items-center gap-1 shrink-0">
-          {!msg.read && (
-            <button onClick={() => { markRead(msg.id); onRefresh(); }} title="Mark as read"
-              className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors">
-              <CheckCircle className="h-4 w-4" />
-            </button>
-          )}
-          <button onClick={() => setExpanded(v => !v)}
-            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
-            {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-          </button>
-          <button onClick={() => { deleteMsg(msg.id); onRefresh(); }} title="Delete"
-            className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors">
-            <Trash2 className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
-      <AnimatePresence>
-        {expanded && (
-          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-            <div className="mt-3 pt-3 border-t border-border space-y-2 text-sm">
-              <div className="flex gap-2"><span className="text-muted-foreground w-16 shrink-0">Phone:</span><span className="text-foreground">{msg.phone}</span></div>
-              <div className="flex gap-2"><span className="text-muted-foreground w-16 shrink-0">Message:</span><span className="text-foreground whitespace-pre-wrap">{msg.message}</span></div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.div>
-  );
-}
-
-/* ═══════════════════════════════════════════
+/* ════════════════════════════════════════════════════════
    MESSAGES TAB
-═══════════════════════════════════════════ */
+════════════════════════════════════════════════════════ */
 function MessagesTab() {
+  const { t } = useLanguage();
   const [messages, setMessages] = useState<ContactMessage[]>([]);
   const [filter, setFilter] = useState<"all" | "unread" | "read">("all");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  const refresh = useCallback(() => setMessages(getMessages()), []);
+  const refresh = useCallback(() => {
+    setMessages(JSON.parse(localStorage.getItem(MESSAGES_KEY) || "[]"));
+  }, []);
 
-  useEffect(() => {
-    refresh();
-    const id = setInterval(refresh, 3000);
-    return () => clearInterval(id);
-  }, [refresh]);
+  useEffect(() => { refresh(); const id = setInterval(refresh, 3000); return () => clearInterval(id); }, [refresh]);
 
-  const unread   = messages.filter(m => !m.read).length;
+  const unread = messages.filter(m => !m.read).length;
   const filtered = filter === "all" ? messages : filter === "unread" ? messages.filter(m => !m.read) : messages.filter(m => m.read);
+
+  function markRead(id: string) {
+    const u = messages.map(m => m.id === id ? { ...m, read: true } : m);
+    localStorage.setItem(MESSAGES_KEY, JSON.stringify(u)); refresh();
+  }
+  function del(id: string) {
+    localStorage.setItem(MESSAGES_KEY, JSON.stringify(messages.filter(m => m.id !== id))); refresh();
+  }
+  function markAllRead() {
+    localStorage.setItem(MESSAGES_KEY, JSON.stringify(messages.map(m => ({ ...m, read: true })))); refresh();
+  }
 
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-3 gap-4">
-        <Card className="border-border bg-card"><CardContent className="p-4">
-          <p className="text-sm text-muted-foreground">Total</p>
-          <p className="text-3xl font-bold text-foreground mt-1">{messages.length}</p>
-        </CardContent></Card>
-        <Card className="border-primary/30 bg-primary/5"><CardContent className="p-4">
-          <p className="text-sm text-muted-foreground">Unread</p>
-          <p className="text-3xl font-bold text-primary mt-1">{unread}</p>
-        </CardContent></Card>
-        <Card className="border-border bg-card"><CardContent className="p-4">
-          <p className="text-sm text-muted-foreground">Read</p>
-          <p className="text-3xl font-bold text-foreground mt-1">{messages.length - unread}</p>
-        </CardContent></Card>
+        {[
+          { label: t("Total", "الكل"), value: messages.length, cls: "border-border bg-card" },
+          { label: t("Unread", "غير مقروء"), value: unread, cls: "border-primary/30 bg-primary/5" },
+          { label: t("Read", "مقروء"), value: messages.length - unread, cls: "border-border bg-card" },
+        ].map(s => (
+          <Card key={s.label} className={s.cls}><CardContent className="p-4">
+            <p className="text-sm text-muted-foreground">{s.label}</p>
+            <p className={`text-3xl font-bold mt-1 ${s.value === unread && unread > 0 ? "text-primary" : "text-foreground"}`}>{s.value}</p>
+          </CardContent></Card>
+        ))}
       </div>
-
       <div>
         <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-          <div className="flex items-center gap-2">
-            <MessageSquare className="h-5 w-5 text-primary" />
-            <h2 className="font-semibold text-foreground">Client Messages</h2>
-          </div>
+          <div className="flex items-center gap-2"><MessageSquare className="h-5 w-5 text-primary" /><h2 className="font-semibold">{t("Client Messages", "رسائل العملاء")}</h2></div>
           <div className="flex items-center gap-2">
             <div className="flex rounded-lg border border-border overflow-hidden">
-              {(["all", "unread", "read"] as const).map(f => (
+              {(["all","unread","read"] as const).map(f => (
                 <button key={f} onClick={() => setFilter(f)}
-                  className={`px-3 py-1.5 text-sm capitalize transition-colors ${filter === f ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}>
-                  {f}
+                  className={`px-3 py-1.5 text-sm transition-colors ${filter === f ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}>
+                  {f === "all" ? t("All","الكل") : f === "unread" ? t("Unread","غير مقروء") : t("Read","مقروء")}
                 </button>
               ))}
             </div>
             {unread > 0 && (
-              <Button variant="outline" size="sm" className="text-xs gap-1"
-                onClick={() => { const u = getMessages().map(m => ({ ...m, read: true })); localStorage.setItem(MESSAGES_KEY, JSON.stringify(u)); refresh(); }}>
-                <CheckCircle className="h-3 w-3" /> Mark all read
+              <Button variant="outline" size="sm" onClick={markAllRead} className="gap-1 text-xs">
+                <CheckCircle className="h-3 w-3" />{t("Mark all read", "تعليم الكل مقروء")}
               </Button>
             )}
           </div>
@@ -276,9 +211,57 @@ function MessagesTab() {
               <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                 className="text-center py-16 text-muted-foreground">
                 <MessageSquare className="h-12 w-12 mx-auto mb-3 opacity-30" />
-                <p className="text-sm">No messages yet</p>
+                <p className="text-sm">{t("No messages yet", "لا توجد رسائل بعد")}</p>
               </motion.div>
-            ) : filtered.map(msg => <MessageCard key={msg.id} msg={msg} onRefresh={refresh} />)}
+            ) : filtered.map(msg => {
+              const expanded = expandedId === msg.id;
+              const date = new Date(msg.timestamp).toLocaleDateString("en-US", { year:"numeric", month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" });
+              const ptLabel = PROJECT_TYPE_LABELS[msg.projectType];
+              return (
+                <motion.div key={msg.id} layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: -20 }}
+                  className={`rounded-xl border p-4 transition-colors ${msg.read ? "border-border bg-card/50" : "border-primary/40 bg-primary/5"}`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-semibold text-foreground">{msg.name}</span>
+                        {!msg.read && <Badge className="bg-primary text-primary-foreground text-xs px-2 py-0">{t("New","جديد")}</Badge>}
+                        {ptLabel && <Badge variant="outline" className="text-xs px-2 py-0">{t(ptLabel.en, ptLabel.ar)}</Badge>}
+                      </div>
+                      <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground flex-wrap">
+                        <span className="flex items-center gap-1"><Mail className="h-3 w-3" />{msg.email}</span>
+                        <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{date}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {!msg.read && (
+                        <button onClick={() => markRead(msg.id)} title={t("Mark read","تعليم مقروء")}
+                          className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors">
+                          <CheckCircle className="h-4 w-4" />
+                        </button>
+                      )}
+                      <button onClick={() => setExpandedId(expanded ? null : msg.id)}
+                        className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                        {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                      </button>
+                      <button onClick={() => del(msg.id)} title={t("Delete","حذف")}
+                        className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                  <AnimatePresence>
+                    {expanded && (
+                      <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+                        <div className="mt-3 pt-3 border-t border-border space-y-2 text-sm">
+                          <div className="flex gap-2"><span className="text-muted-foreground shrink-0 w-14">{t("Phone","الهاتف")}:</span><span className="text-foreground">{msg.phone}</span></div>
+                          <div className="flex gap-2"><span className="text-muted-foreground shrink-0 w-14">{t("Msg","الرسالة")}:</span><span className="text-foreground whitespace-pre-wrap">{msg.message}</span></div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </motion.div>
+              );
+            })}
           </AnimatePresence>
         </div>
       </div>
@@ -286,31 +269,270 @@ function MessagesTab() {
   );
 }
 
-/* ═══════════════════════════════════════════
-   SETTINGS TAB
-═══════════════════════════════════════════ */
-function SettingsTab() {
-  const current = getAdminSettings();
+/* ════════════════════════════════════════════════════════
+   PROJECT FORM (add / edit)
+════════════════════════════════════════════════════════ */
+const EMPTY_PROJ = { titleEn:"", titleAr:"", descEn:"", descAr:"", tags:"", link:"", gradient: GRADIENTS[0].value };
 
-  const [shortcutKey, setShortcutKey]     = useState(current.shortcutKey);
-  const [newUsername, setNewUsername]     = useState(current.username);
-  const [currentPass, setCurrentPass]     = useState("");
-  const [newPass, setNewPass]             = useState("");
-  const [confirmPass, setConfirmPass]     = useState("");
-  const [showCurrent, setShowCurrent]     = useState(false);
-  const [showNew, setShowNew]             = useState(false);
-  const [showConfirm, setShowConfirm]     = useState(false);
+function ProjectForm({ initial, onSave, onCancel, t }: {
+  initial?: Partial<typeof EMPTY_PROJ & { id: string }>;
+  onSave: () => void; onCancel: () => void;
+  t: (en: string, ar: string) => string;
+}) {
+  const [form, setForm] = useState({ ...EMPTY_PROJ, ...initial });
+  const set = (k: keyof typeof EMPTY_PROJ) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+    setForm(f => ({ ...f, [k]: e.target.value }));
+
+  function handleSave() {
+    if (!form.titleEn.trim() && !form.titleAr.trim()) return;
+    const data = {
+      titleEn: form.titleEn.trim(), titleAr: form.titleAr.trim(),
+      descEn: form.descEn.trim(), descAr: form.descAr.trim(),
+      tags: form.tags.split(",").map(s => s.trim()).filter(Boolean),
+      link: form.link.trim(), gradient: form.gradient,
+    };
+    if (initial?.id) { updateProject(initial.id, data); }
+    else { saveProject(data); }
+    window.dispatchEvent(new CustomEvent("portfolio-projects-changed"));
+    onSave();
+  }
+
+  return (
+    <div className="space-y-4 rounded-xl border border-border bg-muted/30 p-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <FormRow label={t("Title (English)", "العنوان (إنجليزي)")}>
+          <Input placeholder="My Awesome Project" value={form.titleEn} onChange={set("titleEn")} />
+        </FormRow>
+        <FormRow label={t("Title (Arabic)", "العنوان (عربي)")}>
+          <Input placeholder="مشروعي الرائع" value={form.titleAr} onChange={set("titleAr")} dir="rtl" />
+        </FormRow>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <FormRow label={t("Description (EN)", "الوصف (إنجليزي)")}>
+          <Textarea placeholder="Short description…" value={form.descEn} onChange={set("descEn")} className="min-h-[80px] resize-none" />
+        </FormRow>
+        <FormRow label={t("Description (AR)", "الوصف (عربي)")}>
+          <Textarea placeholder="وصف مختصر…" value={form.descAr} onChange={set("descAr")} dir="rtl" className="min-h-[80px] resize-none" />
+        </FormRow>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <FormRow label={t("Tags (comma separated)", "التاقات (مفصولة بفاصلة)")}>
+          <Input placeholder="React, Firebase, Tailwind" value={form.tags} onChange={set("tags")} />
+        </FormRow>
+        <FormRow label={t("Project Link", "رابط المشروع")}>
+          <Input placeholder="https://…" value={form.link} onChange={set("link")} />
+        </FormRow>
+      </div>
+      <FormRow label={t("Card Color", "لون البطاقة")}>
+        <div className="flex flex-wrap gap-2">
+          {GRADIENTS.map(g => (
+            <button key={g.value} onClick={() => setForm(f => ({ ...f, gradient: g.value }))}
+              className={`w-10 h-10 rounded-lg bg-gradient-to-br ${g.value} border-2 transition-all ${form.gradient === g.value ? "border-primary scale-110" : "border-border hover:border-primary/50"}`}
+              title={g.label} />
+          ))}
+        </div>
+      </FormRow>
+      <div className="flex gap-2 pt-1">
+        <Button onClick={handleSave} size="sm" className="gap-1"><Save className="h-4 w-4" />{t("Save", "حفظ")}</Button>
+        <Button onClick={onCancel} variant="ghost" size="sm">{t("Cancel", "إلغاء")}</Button>
+      </div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════
+   PROJECTS TAB
+════════════════════════════════════════════════════════ */
+function ProjectsTab() {
+  const { t } = useLanguage();
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [adding, setAdding]     = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  const refresh = useCallback(() => setProjects(getProjects()), []);
+  useEffect(() => { refresh(); }, [refresh]);
+
+  function handleSave() { refresh(); setAdding(false); setEditingId(null); }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2"><FolderOpen className="h-5 w-5 text-primary" /><h2 className="font-semibold">{t("Projects", "المشاريع")}</h2></div>
+        {!adding && (
+          <Button size="sm" onClick={() => { setAdding(true); setEditingId(null); }} className="gap-1">
+            <Plus className="h-4 w-4" />{t("Add Project", "إضافة مشروع")}
+          </Button>
+        )}
+      </div>
+
+      {adding && <ProjectForm t={t} onSave={handleSave} onCancel={() => setAdding(false)} />}
+
+      {projects.length === 0 && !adding ? (
+        <div className="text-center py-12 text-muted-foreground">
+          <FolderOpen className="h-12 w-12 mx-auto mb-3 opacity-30" />
+          <p className="text-sm">{t("No projects yet. Add your first one!", "لا توجد مشاريع بعد. أضف أول مشروع!")}</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {projects.map(p => (
+            <div key={p.id}>
+              {editingId === p.id ? (
+                <ProjectForm t={t} initial={{ id: p.id, titleEn: p.titleEn, titleAr: p.titleAr, descEn: p.descEn, descAr: p.descAr, tags: p.tags.join(", "), link: p.link, gradient: p.gradient }}
+                  onSave={handleSave} onCancel={() => setEditingId(null)} />
+              ) : (
+                <div className="flex items-center gap-3 rounded-xl border border-border bg-card/60 p-4">
+                  <div className={`w-12 h-12 rounded-lg bg-gradient-to-br ${p.gradient} shrink-0`} />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-foreground truncate">{p.titleEn || p.titleAr}</p>
+                    {(p.titleAr && p.titleEn) && <p className="text-sm text-muted-foreground truncate" dir="rtl">{p.titleAr}</p>}
+                    {p.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1">{p.tags.slice(0,4).map(tag => <Badge key={tag} variant="secondary" className="text-xs py-0">{tag}</Badge>)}</div>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button onClick={() => { setEditingId(p.id); setAdding(false); }}
+                      className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors">
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                    <button onClick={() => { deleteProject(p.id); refresh(); window.dispatchEvent(new CustomEvent("portfolio-projects-changed")); }}
+                      className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════
+   REVIEWS TAB
+════════════════════════════════════════════════════════ */
+function ReviewsTab() {
+  const { t } = useLanguage();
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [filter, setFilter]   = useState<"all" | "pending" | "approved">("all");
+
+  const refresh = useCallback(() => setReviews(getReviews()), []);
+  useEffect(() => { refresh(); const id = setInterval(refresh, 3000); return () => clearInterval(id); }, [refresh]);
+
+  const pending  = reviews.filter(r => !r.approved).length;
+  const approved = reviews.filter(r =>  r.approved).length;
+  const filtered = filter === "all" ? reviews : filter === "pending" ? reviews.filter(r => !r.approved) : reviews.filter(r => r.approved);
+
+  function approve(id: string) { approveReview(id); refresh(); window.dispatchEvent(new CustomEvent("portfolio-reviews-changed")); }
+  function del(id: string) { deleteReview(id); refresh(); window.dispatchEvent(new CustomEvent("portfolio-reviews-changed")); }
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-3 gap-4">
+        {[
+          { label: t("Total","الكل"), value: reviews.length, cls: "border-border bg-card" },
+          { label: t("Pending","في الانتظار"), value: pending, cls: pending > 0 ? "border-secondary/40 bg-secondary/5" : "border-border bg-card" },
+          { label: t("Approved","مقبول"), value: approved, cls: "border-border bg-card" },
+        ].map(s => (
+          <Card key={s.label} className={s.cls}><CardContent className="p-4">
+            <p className="text-sm text-muted-foreground">{s.label}</p>
+            <p className={`text-3xl font-bold mt-1 ${s.value === pending && pending > 0 ? "text-secondary" : "text-foreground"}`}>{s.value}</p>
+          </CardContent></Card>
+        ))}
+      </div>
+
+      <div>
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+          <div className="flex items-center gap-2"><Star className="h-5 w-5 text-primary" /><h2 className="font-semibold">{t("Client Reviews", "تقييمات العملاء")}</h2></div>
+          <div className="flex rounded-lg border border-border overflow-hidden">
+            {(["all","pending","approved"] as const).map(f => (
+              <button key={f} onClick={() => setFilter(f)}
+                className={`px-3 py-1.5 text-sm transition-colors ${filter === f ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}>
+                {f === "all" ? t("All","الكل") : f === "pending" ? t("Pending","انتظار") : t("Approved","مقبول")}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <AnimatePresence mode="popLayout">
+            {filtered.length === 0 ? (
+              <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-12 text-muted-foreground">
+                <Star className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                <p className="text-sm">{t("No reviews yet", "لا توجد تقييمات بعد")}</p>
+              </motion.div>
+            ) : filtered.map(r => {
+              const initials = r.name.trim().split(" ").map(w => w[0]).slice(0,2).join("").toUpperCase();
+              const date = new Date(r.timestamp).toLocaleDateString("en-US", { year:"numeric", month:"short", day:"numeric" });
+              return (
+                <motion.div key={r.id} layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: -20 }}
+                  className={`rounded-xl border p-4 transition-colors ${r.approved ? "border-border bg-card/50" : "border-secondary/40 bg-secondary/5"}`}>
+                  <div className="flex items-start gap-3">
+                    <Avatar className="h-10 w-10 border border-border shrink-0">
+                      <AvatarFallback className="bg-primary/10 text-primary text-sm font-bold">{initials}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-semibold text-foreground">{r.name}</span>
+                        {r.role && <span className="text-sm text-muted-foreground">· {r.role}</span>}
+                        <Badge variant={r.approved ? "secondary" : "outline"} className="text-xs px-2 py-0">
+                          {r.approved ? t("Approved","مقبول") : t("Pending","انتظار")}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-2 mt-1">
+                        <StarRow value={r.rating} />
+                        <span className="text-xs text-muted-foreground">{date}</span>
+                      </div>
+                      <p className="text-sm text-foreground/80 mt-2 line-clamp-3">{r.text}</p>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {!r.approved && (
+                        <button onClick={() => approve(r.id)} title={t("Approve","قبول")}
+                          className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors">
+                          <ThumbsUp className="h-4 w-4" />
+                        </button>
+                      )}
+                      <button onClick={() => del(r.id)} title={t("Delete","حذف")}
+                        className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════
+   SETTINGS TAB
+════════════════════════════════════════════════════════ */
+function SettingsTab() {
+  const { t, language, setLanguage } = useLanguage();
+  const current = getAdminSettings();
+  const [shortcutKey, setShortcutKey] = useState(current.shortcutKey);
+  const [newUsername, setNewUsername] = useState(current.username);
+  const [currentPass, setCurrentPass] = useState("");
+  const [newPass, setNewPass]         = useState("");
+  const [confirmPass, setConfirmPass] = useState("");
+  const [showCur, setShowCur]         = useState(false);
+  const [showNew, setShowNew]         = useState(false);
+  const [showConf, setShowConf]       = useState(false);
+  const [isCapturing, setIsCapturing] = useState(false);
   const [shortcutSaved, setShortcutSaved] = useState(false);
   const [credSaved, setCredSaved]         = useState(false);
   const [credError, setCredError]         = useState("");
-  const [isCapturing, setIsCapturing]     = useState(false);
 
-  /* Capture shortcut key from keyboard */
   useEffect(() => {
     if (!isCapturing) return;
     function onKey(e: KeyboardEvent) {
       e.preventDefault();
-      if (["Control", "Shift", "Alt", "Meta"].includes(e.key)) return;
+      if (["Control","Shift","Alt","Meta"].includes(e.key)) return;
       setShortcutKey(e.key === " " ? "Space" : e.key);
       setIsCapturing(false);
     }
@@ -319,116 +541,96 @@ function SettingsTab() {
   }, [isCapturing]);
 
   function saveShortcut() {
-    const s = getAdminSettings();
-    saveSettings({ ...s, shortcutKey });
-    setShortcutSaved(true);
-    setTimeout(() => setShortcutSaved(false), 2000);
+    persistSettings({ ...getAdminSettings(), shortcutKey });
+    setShortcutSaved(true); setTimeout(() => setShortcutSaved(false), 2000);
     window.dispatchEvent(new CustomEvent("admin-settings-changed"));
   }
-
-  function saveCredentials() {
+  function saveCreds() {
     setCredError("");
     const s = getAdminSettings();
-    if (currentPass !== s.password) { setCredError("Current password is incorrect."); return; }
-    if (newPass && newPass !== confirmPass) { setCredError("New passwords do not match."); return; }
-    if (newPass && newPass.length < 6) { setCredError("New password must be at least 6 characters."); return; }
-    saveSettings({ ...s, username: newUsername || s.username, password: newPass || s.password });
+    if (currentPass !== s.password) { setCredError(t("Current password is incorrect.","كلمة المرور الحالية غير صحيحة.")); return; }
+    if (newPass && newPass !== confirmPass) { setCredError(t("Passwords do not match.","كلمتا المرور غير متطابقتين.")); return; }
+    if (newPass && newPass.length < 6) { setCredError(t("Password must be at least 6 characters.","كلمة المرور يجب أن تكون 6 أحرف على الأقل.")); return; }
+    persistSettings({ ...s, username: newUsername || s.username, password: newPass || s.password });
     setCurrentPass(""); setNewPass(""); setConfirmPass("");
-    setCredSaved(true);
-    setTimeout(() => setCredSaved(false), 2000);
+    setCredSaved(true); setTimeout(() => setCredSaved(false), 2000);
   }
 
-  const displayShortcut = shortcutKey ? `Ctrl + Shift + ${shortcutKey}` : "— not set —";
+  const displayShortcut = `Ctrl + Shift + ${shortcutKey || "?"}`;
 
   return (
     <div className="space-y-6">
-      {/* ── Keyboard Shortcut ── */}
+      {/* Language toggle */}
       <Card className="border-border bg-card">
         <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <KeyRound className="h-4 w-4 text-primary" /> Keyboard Shortcut
-          </CardTitle>
-          <p className="text-sm text-muted-foreground">Change the key combination that opens this panel.</p>
+          <CardTitle className="flex items-center gap-2 text-base"><Globe2 className="h-4 w-4 text-primary" />{t("Language", "اللغة")}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex rounded-lg border border-border overflow-hidden w-fit">
+            {(["en","ar"] as const).map(lang => (
+              <button key={lang} onClick={() => setLanguage(lang)}
+                className={`px-5 py-2 text-sm font-medium transition-colors ${language === lang ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}>
+                {lang === "en" ? "English" : "العربية"}
+              </button>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Keyboard shortcut */}
+      <Card className="border-border bg-card">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base"><KeyRound className="h-4 w-4 text-primary" />{t("Keyboard Shortcut","اختصار لوحة المفاتيح")}</CardTitle>
+          <p className="text-sm text-muted-foreground">{t("Change the key combination that opens this panel.","غير الاختصار الذي يفتح هذه اللوحة.")}</p>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-foreground">Current shortcut</label>
-            <div
-              onClick={() => setIsCapturing(true)}
-              className={`flex items-center justify-between px-4 py-3 rounded-lg border cursor-pointer transition-colors select-none font-mono text-sm
-                ${isCapturing ? "border-primary bg-primary/10 text-primary" : "border-border bg-muted/50 text-foreground hover:border-primary/50"}`}>
-              <span>{isCapturing ? "Press any key…" : displayShortcut}</span>
-              <span className="text-xs text-muted-foreground">{isCapturing ? "ESC to cancel" : "Click to change"}</span>
-            </div>
-            {isCapturing && (
-              <button onClick={() => setIsCapturing(false)} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
-                Cancel
-              </button>
-            )}
+          <div onClick={() => setIsCapturing(true)}
+            className={`flex items-center justify-between px-4 py-3 rounded-lg border cursor-pointer select-none font-mono text-sm transition-colors
+              ${isCapturing ? "border-primary bg-primary/10 text-primary" : "border-border bg-muted/50 text-foreground hover:border-primary/50"}`}>
+            <span>{isCapturing ? t("Press any key…","اضغط أي مفتاح…") : displayShortcut}</span>
+            <span className="text-xs text-muted-foreground">{isCapturing ? t("ESC to cancel","ESC للإلغاء") : t("Click to change","انقر للتغيير")}</span>
           </div>
-          <Button onClick={saveShortcut} className="gap-2" size="sm">
-            {shortcutSaved ? <><CheckCircle className="h-4 w-4" /> Saved!</> : <><Save className="h-4 w-4" /> Save Shortcut</>}
+          {isCapturing && <button onClick={() => setIsCapturing(false)} className="text-xs text-muted-foreground hover:text-foreground transition-colors">{t("Cancel","إلغاء")}</button>}
+          <Button onClick={saveShortcut} size="sm" className="gap-2">
+            {shortcutSaved ? <><CheckCircle className="h-4 w-4" />{t("Saved!","تم الحفظ!")}</> : <><Save className="h-4 w-4" />{t("Save Shortcut","حفظ الاختصار")}</>}
           </Button>
         </CardContent>
       </Card>
 
-      {/* ── Credentials ── */}
+      {/* Credentials */}
       <Card className="border-border bg-card">
         <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <ShieldCheck className="h-4 w-4 text-primary" /> Login Credentials
-          </CardTitle>
-          <p className="text-sm text-muted-foreground">Update your admin username and password.</p>
+          <CardTitle className="flex items-center gap-2 text-base"><ShieldCheck className="h-4 w-4 text-primary" />{t("Login Credentials","بيانات تسجيل الدخول")}</CardTitle>
+          <p className="text-sm text-muted-foreground">{t("Update your admin username and password.","غير اسم المستخدم وكلمة المرور.")}</p>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-foreground">Username</label>
-            <div className="relative">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input className="pl-10" value={newUsername} onChange={e => setNewUsername(e.target.value)} placeholder="admin" />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-foreground">Current Password <span className="text-destructive">*</span></label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input className="pl-10 pr-10" type={showCurrent ? "text" : "password"} value={currentPass}
-                onChange={e => setCurrentPass(e.target.value)} placeholder="Enter current password" />
-              <button type="button" onClick={() => setShowCurrent(v => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
-                {showCurrent ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
-            </div>
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-foreground">New Password <span className="text-muted-foreground text-xs">(leave blank to keep current)</span></label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input className="pl-10 pr-10" type={showNew ? "text" : "password"} value={newPass}
-                onChange={e => setNewPass(e.target.value)} placeholder="New password" />
-              <button type="button" onClick={() => setShowNew(v => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
-                {showNew ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
-            </div>
-          </div>
+          <FormRow label={t("Username","اسم المستخدم")}>
+            <div className="relative"><User className="absolute left-3 rtl:right-3 rtl:left-auto top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input className="pl-10 rtl:pr-10 rtl:pl-3" value={newUsername} onChange={e => setNewUsername(e.target.value)} /></div>
+          </FormRow>
+          <FormRow label={t("Current Password","كلمة المرور الحالية") + " *"}>
+            <div className="relative"><Lock className="absolute left-3 rtl:right-3 rtl:left-auto top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input className="pl-10 rtl:pr-10 rtl:pl-3 pr-10" type={showCur ? "text" : "password"} value={currentPass} onChange={e => setCurrentPass(e.target.value)} />
+              <button type="button" onClick={() => setShowCur(v => !v)} className="absolute right-3 rtl:left-3 rtl:right-auto top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
+                {showCur ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></div>
+          </FormRow>
+          <FormRow label={t("New Password","كلمة مرور جديدة")}>
+            <div className="relative"><Lock className="absolute left-3 rtl:right-3 rtl:left-auto top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input className="pl-10 rtl:pr-10 rtl:pl-3 pr-10" type={showNew ? "text" : "password"} value={newPass} onChange={e => setNewPass(e.target.value)} />
+              <button type="button" onClick={() => setShowNew(v => !v)} className="absolute right-3 rtl:left-3 rtl:right-auto top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
+                {showNew ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></div>
+          </FormRow>
           {newPass && (
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground">Confirm New Password</label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input className="pl-10 pr-10" type={showConfirm ? "text" : "password"} value={confirmPass}
-                  onChange={e => setConfirmPass(e.target.value)} placeholder="Repeat new password" />
-                <button type="button" onClick={() => setShowConfirm(v => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
-                  {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-            </div>
+            <FormRow label={t("Confirm New Password","تأكيد كلمة المرور")}>
+              <div className="relative"><Lock className="absolute left-3 rtl:right-3 rtl:left-auto top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input className="pl-10 rtl:pr-10 rtl:pl-3 pr-10" type={showConf ? "text" : "password"} value={confirmPass} onChange={e => setConfirmPass(e.target.value)} />
+                <button type="button" onClick={() => setShowConf(v => !v)} className="absolute right-3 rtl:left-3 rtl:right-auto top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
+                  {showConf ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></div>
+            </FormRow>
           )}
-          {credError && <p className="text-sm text-destructive font-medium">{credError}</p>}
-          <Button onClick={saveCredentials} className="gap-2" size="sm">
-            {credSaved ? <><CheckCircle className="h-4 w-4" /> Saved!</> : <><Save className="h-4 w-4" /> Save Credentials</>}
+          {credError && <p className="text-sm text-destructive">{credError}</p>}
+          <Button onClick={saveCreds} size="sm" className="gap-2">
+            {credSaved ? <><CheckCircle className="h-4 w-4" />{t("Saved!","تم!")}</> : <><Save className="h-4 w-4" />{t("Save Credentials","حفظ البيانات")}</>}
           </Button>
         </CardContent>
       </Card>
@@ -436,50 +638,53 @@ function SettingsTab() {
   );
 }
 
-/* ═══════════════════════════════════════════
-   DASHBOARD (tabs: Messages | Settings)
-═══════════════════════════════════════════ */
-type Tab = "messages" | "settings";
+/* ════════════════════════════════════════════════════════
+   DASHBOARD
+════════════════════════════════════════════════════════ */
+type Tab = "messages" | "projects" | "reviews" | "settings";
 
 function Dashboard({ onLogout }: { onLogout: () => void }) {
+  const { t } = useLanguage();
   const [tab, setTab] = useState<Tab>("messages");
+
+  const tabs: { id: Tab; icon: React.ReactNode; label: string }[] = [
+    { id: "messages", icon: <MessageSquare className="h-4 w-4" />, label: t("Messages","رسائل") },
+    { id: "projects", icon: <FolderOpen className="h-4 w-4" />,    label: t("Projects","مشاريع") },
+    { id: "reviews",  icon: <Star className="h-4 w-4" />,          label: t("Reviews","تقييمات") },
+    { id: "settings", icon: <Settings className="h-4 w-4" />,       label: t("Settings","إعدادات") },
+  ];
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-card shrink-0">
         <div className="flex items-center gap-3">
-          <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
-            <LayoutDashboard className="h-5 w-5 text-primary" />
-          </div>
+          <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center"><LayoutDashboard className="h-5 w-5 text-primary" /></div>
           <div>
-            <h1 className="font-bold text-foreground text-lg leading-none">Admin Panel</h1>
+            <h1 className="font-bold text-foreground text-lg leading-none">{t("Admin Panel","لوحة التحكم")}</h1>
             <p className="text-xs text-muted-foreground mt-0.5">Abdelrahman Mohamed</p>
           </div>
         </div>
         <Button variant="ghost" size="sm" onClick={onLogout} className="gap-2 text-muted-foreground hover:text-foreground">
-          <LogOut className="h-4 w-4" />
-          <span className="hidden sm:inline">Sign Out</span>
+          <LogOut className="h-4 w-4" /><span className="hidden sm:inline">{t("Sign Out","خروج")}</span>
         </Button>
       </div>
 
-      {/* Tabs */}
-      <div className="flex border-b border-border shrink-0 bg-card">
-        <button onClick={() => setTab("messages")}
-          className={`flex items-center gap-2 px-5 py-3 text-sm font-medium transition-colors border-b-2 ${tab === "messages" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
-          <MessageSquare className="h-4 w-4" /> Messages
-        </button>
-        <button onClick={() => setTab("settings")}
-          className={`flex items-center gap-2 px-5 py-3 text-sm font-medium transition-colors border-b-2 ${tab === "settings" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
-          <Settings className="h-4 w-4" /> Settings
-        </button>
+      <div className="flex border-b border-border shrink-0 bg-card overflow-x-auto">
+        {tabs.map(tb => (
+          <button key={tb.id} onClick={() => setTab(tb.id)}
+            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors border-b-2 ${tab === tb.id ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
+            {tb.icon}{tb.label}
+          </button>
+        ))}
       </div>
 
-      {/* Tab content */}
       <div className="flex-1 overflow-y-auto p-6">
         <AnimatePresence mode="wait">
           <motion.div key={tab} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.15 }}>
-            {tab === "messages" ? <MessagesTab /> : <SettingsTab />}
+            {tab === "messages" && <MessagesTab />}
+            {tab === "projects" && <ProjectsTab />}
+            {tab === "reviews"  && <ReviewsTab />}
+            {tab === "settings" && <SettingsTab />}
           </motion.div>
         </AnimatePresence>
       </div>
@@ -487,26 +692,19 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   );
 }
 
-/* ═══════════════════════════════════════════
+/* ════════════════════════════════════════════════════════
    ROOT EXPORT
-═══════════════════════════════════════════ */
-interface AdminPanelProps {
-  open: boolean;
-  onClose: () => void;
-}
+════════════════════════════════════════════════════════ */
+interface AdminPanelProps { open: boolean; onClose: () => void; }
 
 export default function AdminPanel({ open, onClose }: AdminPanelProps) {
   const [loggedIn, setLoggedIn] = useState(() => sessionStorage.getItem(SESSION_KEY) === "1");
 
-  function handleLogout() {
-    sessionStorage.removeItem(SESSION_KEY);
-    setLoggedIn(false);
-    onClose();
-  }
+  function handleLogout() { sessionStorage.removeItem(SESSION_KEY); setLoggedIn(false); onClose(); }
 
   useEffect(() => {
     if (!open) return;
-    function onKey(e: KeyboardEvent) { if (e.key === "Escape") onClose(); }
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
@@ -527,13 +725,14 @@ export default function AdminPanel({ open, onClose }: AdminPanelProps) {
             transition={{ type: "spring", stiffness: 300, damping: 30 }}
             className="w-full max-w-2xl h-full bg-background border-l border-border shadow-2xl flex flex-col relative"
             onClick={e => e.stopPropagation()}>
-            <button data-testid="button-admin-close" onClick={onClose}
-              className="absolute top-4 right-4 z-10 p-2 rounded-full bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground transition-colors">
+            <button onClick={onClose}
+              className="absolute top-4 right-4 rtl:left-4 rtl:right-auto z-10 p-2 rounded-full bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground transition-colors">
               <X className="h-4 w-4" />
             </button>
             {!loggedIn
               ? <div className="flex-1 flex items-center justify-center p-8"><LoginForm onLogin={() => setLoggedIn(true)} /></div>
-              : <Dashboard onLogout={handleLogout} />}
+              : <Dashboard onLogout={handleLogout} />
+            }
           </motion.div>
         </motion.div>
       )}
