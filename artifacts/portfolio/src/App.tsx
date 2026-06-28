@@ -24,14 +24,29 @@ function App() {
   const [adminOpen, setAdminOpen] = useState(false);
 
   useEffect(() => {
+    function getKey() {
+      try {
+        const s = JSON.parse(localStorage.getItem("admin_settings") || "{}");
+        return (s.shortcutKey || "6").toLowerCase();
+      } catch { return "6"; }
+    }
+
     function handleKey(e: KeyboardEvent) {
-      if (e.ctrlKey && e.shiftKey && (e.code === "Digit6" || e.key === "^" || e.key === "6")) {
+      const target = getKey();
+      const pressed = e.key.toLowerCase();
+      const codeMatch = e.code === `Digit${target}` || e.code === `Key${target.toUpperCase()}`;
+      if (e.ctrlKey && e.shiftKey && (pressed === target || codeMatch)) {
         e.preventDefault();
         setAdminOpen(v => !v);
       }
     }
+
     window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
+    window.addEventListener("admin-settings-changed", () => {});
+    return () => {
+      window.removeEventListener("keydown", handleKey);
+      window.removeEventListener("admin-settings-changed", () => {});
+    };
   }, []);
 
   return (
