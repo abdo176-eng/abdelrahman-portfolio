@@ -16,6 +16,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import {
   getProjects, saveProject, updateProject, deleteProject, type Project,
   getReviews, approveReview, deleteReview, type Review,
+  getStats, saveStats, type StatItem,
 } from "@/lib/store";
 
 /* ─── Admin-specific localStorage keys ─── */
@@ -510,6 +511,72 @@ function ReviewsTab() {
 }
 
 /* ════════════════════════════════════════════════════════
+   STATS TAB
+════════════════════════════════════════════════════════ */
+function StatsTab() {
+  const { t } = useLanguage();
+  const [stats, setStats] = useState<StatItem[]>(() => getStats());
+  const [saved, setSaved] = useState(false);
+
+  function update(id: string, field: keyof StatItem, value: string) {
+    setStats(prev => prev.map(s => s.id === id ? { ...s, [field]: value } : s));
+    setSaved(false);
+  }
+
+  function handleSave() {
+    saveStats(stats);
+    window.dispatchEvent(new CustomEvent("portfolio-stats-changed"));
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2500);
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <LayoutDashboard className="h-5 w-5 text-primary" />
+          <h2 className="font-semibold">{t("About Stats", "أرقام قسم من أنا")}</h2>
+        </div>
+        <Button size="sm" onClick={handleSave} className="gap-1">
+          {saved
+            ? <><CheckCircle className="h-4 w-4" />{t("Saved!", "تم!")}</>
+            : <><Save className="h-4 w-4" />{t("Save All", "حفظ الكل")}</>
+          }
+        </Button>
+      </div>
+      <p className="text-sm text-muted-foreground mb-4">
+        {t("Edit the numbers shown in the About section of your portfolio.", "عدّل الأرقام التي تظهر في قسم «من أنا» من البورتفوليو.")}
+      </p>
+
+      <div className="space-y-4">
+        {stats.map(stat => (
+          <Card key={stat.id} className="border-border bg-card">
+            <CardContent className="p-4 space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <FormRow label={t("Value (EN)", "القيمة (إنجليزي)")}>
+                  <Input value={stat.valueEn} onChange={e => update(stat.id, "valueEn", e.target.value)} placeholder="50+" />
+                </FormRow>
+                <FormRow label={t("Value (AR)", "القيمة (عربي)")}>
+                  <Input value={stat.valueAr} onChange={e => update(stat.id, "valueAr", e.target.value)} placeholder="+50" dir="rtl" />
+                </FormRow>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <FormRow label={t("Label (EN)", "العنوان (إنجليزي)")}>
+                  <Input value={stat.labelEn} onChange={e => update(stat.id, "labelEn", e.target.value)} />
+                </FormRow>
+                <FormRow label={t("Label (AR)", "العنوان (عربي)")}>
+                  <Input value={stat.labelAr} onChange={e => update(stat.id, "labelAr", e.target.value)} dir="rtl" />
+                </FormRow>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════
    SETTINGS TAB
 ════════════════════════════════════════════════════════ */
 function SettingsTab() {
@@ -641,17 +708,18 @@ function SettingsTab() {
 /* ════════════════════════════════════════════════════════
    DASHBOARD
 ════════════════════════════════════════════════════════ */
-type Tab = "messages" | "projects" | "reviews" | "settings";
+type Tab = "messages" | "projects" | "reviews" | "stats" | "settings";
 
 function Dashboard({ onLogout }: { onLogout: () => void }) {
   const { t } = useLanguage();
   const [tab, setTab] = useState<Tab>("messages");
 
   const tabs: { id: Tab; icon: React.ReactNode; label: string }[] = [
-    { id: "messages", icon: <MessageSquare className="h-4 w-4" />, label: t("Messages","رسائل") },
-    { id: "projects", icon: <FolderOpen className="h-4 w-4" />,    label: t("Projects","مشاريع") },
-    { id: "reviews",  icon: <Star className="h-4 w-4" />,          label: t("Reviews","تقييمات") },
-    { id: "settings", icon: <Settings className="h-4 w-4" />,       label: t("Settings","إعدادات") },
+    { id: "messages", icon: <MessageSquare className="h-4 w-4" />,  label: t("Messages","رسائل") },
+    { id: "projects", icon: <FolderOpen className="h-4 w-4" />,     label: t("Projects","مشاريع") },
+    { id: "reviews",  icon: <Star className="h-4 w-4" />,           label: t("Reviews","تقييمات") },
+    { id: "stats",    icon: <LayoutDashboard className="h-4 w-4" />, label: t("Stats","إحصائيات") },
+    { id: "settings", icon: <Settings className="h-4 w-4" />,        label: t("Settings","إعدادات") },
   ];
 
   return (
@@ -684,6 +752,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
             {tab === "messages" && <MessagesTab />}
             {tab === "projects" && <ProjectsTab />}
             {tab === "reviews"  && <ReviewsTab />}
+            {tab === "stats"    && <StatsTab />}
             {tab === "settings" && <SettingsTab />}
           </motion.div>
         </AnimatePresence>

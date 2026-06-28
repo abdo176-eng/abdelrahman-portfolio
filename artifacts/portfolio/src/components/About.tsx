@@ -1,33 +1,22 @@
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { CheckCircle2, Code2, Users, Clock } from "lucide-react";
+import { getStats, type StatItem } from "@/lib/store";
+
+const ICONS = [Code2, Clock, Users, CheckCircle2];
 
 export default function About() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const [stats, setStats] = useState<StatItem[]>([]);
 
-  const stats = [
-    {
-      icon: CheckCircle2,
-      value: "50+",
-      label: t("Projects Completed", "مشاريع مكتملة"),
-    },
-    {
-      icon: Users,
-      value: "30+",
-      label: t("Happy Clients", "عملاء سعداء"),
-    },
-    {
-      icon: Clock,
-      value: "4+",
-      label: t("Years Experience", "سنوات خبرة"),
-    },
-    {
-      icon: Code2,
-      value: "15+",
-      label: t("Technologies", "تقنيات مستخدمة"),
-    },
-  ];
+  useEffect(() => {
+    function load() { setStats(getStats()); }
+    load();
+    window.addEventListener("portfolio-stats-changed", load);
+    return () => window.removeEventListener("portfolio-stats-changed", load);
+  }, []);
 
   return (
     <section id="about" className="py-24 bg-background">
@@ -49,25 +38,30 @@ export default function About() {
         </motion.div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-          {stats.map((stat, idx) => (
-            <motion.div
-              key={idx}
-              initial={{ opacity: 0, scale: 0.9 }}
-              whileInView={{ opacity: 1, scale: 1 }}
-              viewport={{ once: true }}
-              transition={{ delay: idx * 0.1 }}
-            >
-              <Card className="border-none shadow-md bg-card hover-elevate">
-                <CardContent className="p-6 flex flex-col items-center text-center">
-                  <div className="p-3 bg-secondary/10 text-secondary rounded-full mb-4">
-                    <stat.icon className="h-6 w-6" />
-                  </div>
-                  <h4 className="text-3xl font-bold text-foreground mb-1">{stat.value}</h4>
-                  <p className="text-sm font-medium text-muted-foreground">{stat.label}</p>
-                </CardContent>
-              </Card>
-            </motion.div>
-          ))}
+          {stats.map((stat, idx) => {
+            const Icon = ICONS[idx % ICONS.length];
+            const value = language === "ar" && stat.valueAr ? stat.valueAr : stat.valueEn;
+            const label = language === "ar" && stat.labelAr ? stat.labelAr : stat.labelEn;
+            return (
+              <motion.div
+                key={stat.id}
+                initial={{ opacity: 0, scale: 0.9 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+                transition={{ delay: idx * 0.1 }}
+              >
+                <Card className="border-none shadow-md bg-card">
+                  <CardContent className="p-6 flex flex-col items-center text-center">
+                    <div className="p-3 bg-secondary/10 text-secondary rounded-full mb-4">
+                      <Icon className="h-6 w-6" />
+                    </div>
+                    <h4 className="text-3xl font-bold text-foreground mb-1">{value}</h4>
+                    <p className="text-sm font-medium text-muted-foreground">{label}</p>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            );
+          })}
         </div>
       </div>
     </section>

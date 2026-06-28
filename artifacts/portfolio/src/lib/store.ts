@@ -1,5 +1,34 @@
 /* ─── Central localStorage store for portfolio dynamic data ─── */
 
+/* ══ Stats ══ */
+export interface StatItem {
+  id: string;
+  valueEn: string;
+  valueAr: string;
+  labelEn: string;
+  labelAr: string;
+}
+
+const STATS_KEY = "portfolio_stats";
+
+const DEFAULT_STATS: StatItem[] = [
+  { id: "technologies", valueEn: "15+", valueAr: "+15", labelEn: "Technologies",        labelAr: "تقنيات مستخدمة" },
+  { id: "experience",   valueEn: "4+",  valueAr: "+4",  labelEn: "Years Experience",    labelAr: "سنوات خبرة" },
+  { id: "clients",      valueEn: "30+", valueAr: "+30", labelEn: "Happy Clients",       labelAr: "عملاء سعداء" },
+  { id: "projects",     valueEn: "50+", valueAr: "+50", labelEn: "Projects Completed",  labelAr: "مشاريع مكتملة" },
+];
+
+export function getStats(): StatItem[] {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STATS_KEY) || "null");
+    return saved && saved.length ? saved : DEFAULT_STATS;
+  } catch { return DEFAULT_STATS; }
+}
+
+export function saveStats(stats: StatItem[]) {
+  localStorage.setItem(STATS_KEY, JSON.stringify(stats));
+}
+
 /* ══ Projects ══ */
 export interface Project {
   id: string;
