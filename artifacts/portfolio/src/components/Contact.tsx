@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Phone, Mail, Linkedin, Send } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { saveMessage } from "@/components/AdminPanel";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -50,6 +51,7 @@ export default function Contact() {
   });
 
   function onSubmit(values: z.infer<typeof formSchema>) {
+    saveMessage(values);
     toast({
       title: t("Message Sent!", "تم إرسال الرسالة بنجاح!"),
       description: t(
