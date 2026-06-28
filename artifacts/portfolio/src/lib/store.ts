@@ -39,6 +39,7 @@ export interface Project {
   tags: string[];
   link: string;
   gradient: string;
+  images: string[];   // base64 data URLs
   createdAt: string;
 }
 

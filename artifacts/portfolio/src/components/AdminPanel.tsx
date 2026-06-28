@@ -3,8 +3,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   X, LogOut, Mail, CheckCircle, Trash2, Eye, EyeOff,
   Lock, User, LayoutDashboard, MessageSquare, Clock,
-  ChevronDown, ChevronUp, Settings, Save, KeyRound, ShieldCheck,
-  FolderOpen, Plus, Pencil, Star, ThumbsUp, Globe2,
+  ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Settings, Save, KeyRound, ShieldCheck,
+  FolderOpen, Plus, Pencil, Star, ThumbsUp, Globe2, ImageIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -273,16 +273,42 @@ function MessagesTab() {
 /* ════════════════════════════════════════════════════════
    PROJECT FORM (add / edit)
 ════════════════════════════════════════════════════════ */
-const EMPTY_PROJ = { titleEn:"", titleAr:"", descEn:"", descAr:"", tags:"", link:"", gradient: GRADIENTS[0].value };
+const EMPTY_PROJ = { titleEn:"", titleAr:"", descEn:"", descAr:"", tags:"", link:"", gradient: GRADIENTS[0].value, images: [] as string[] };
 
 function ProjectForm({ initial, onSave, onCancel, t }: {
-  initial?: Partial<typeof EMPTY_PROJ & { id: string }>;
+  initial?: Partial<Omit<typeof EMPTY_PROJ, "images"> & { id: string; images: string[] }>;
   onSave: () => void; onCancel: () => void;
   t: (en: string, ar: string) => string;
 }) {
-  const [form, setForm] = useState({ ...EMPTY_PROJ, ...initial });
-  const set = (k: keyof typeof EMPTY_PROJ) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+  const [form, setForm] = useState({ ...EMPTY_PROJ, ...initial, images: initial?.images ?? [] });
+  const set = (k: keyof Omit<typeof EMPTY_PROJ, "images">) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setForm(f => ({ ...f, [k]: e.target.value }));
+
+  function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    files.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = ev => {
+        const base64 = ev.target?.result as string;
+        setForm(f => ({ ...f, images: [...f.images, base64] }));
+      };
+      reader.readAsDataURL(file);
+    });
+    e.target.value = "";
+  }
+
+  function removeImage(idx: number) {
+    setForm(f => ({ ...f, images: f.images.filter((_, i) => i !== idx) }));
+  }
+
+  function moveImage(from: number, to: number) {
+    setForm(f => {
+      const imgs = [...f.images];
+      const [removed] = imgs.splice(from, 1);
+      imgs.splice(to, 0, removed);
+      return { ...f, images: imgs };
+    });
+  }
 
   function handleSave() {
     if (!form.titleEn.trim() && !form.titleAr.trim()) return;
@@ -291,6 +317,7 @@ function ProjectForm({ initial, onSave, onCancel, t }: {
       descEn: form.descEn.trim(), descAr: form.descAr.trim(),
       tags: form.tags.split(",").map(s => s.trim()).filter(Boolean),
       link: form.link.trim(), gradient: form.gradient,
+      images: form.images,
     };
     if (initial?.id) { updateProject(initial.id, data); }
     else { saveProject(data); }
@@ -324,6 +351,55 @@ function ProjectForm({ initial, onSave, onCancel, t }: {
           <Input placeholder="https://…" value={form.link} onChange={set("link")} />
         </FormRow>
       </div>
+
+      {/* ─── Image Upload ─── */}
+      <FormRow label={t("Project Images", "صور المشروع")}>
+        <div className="space-y-3">
+          <label className="flex items-center gap-2 cursor-pointer w-fit px-3 py-2 rounded-lg border border-dashed border-border hover:border-primary/50 bg-background/50 hover:bg-background transition-colors text-sm text-muted-foreground hover:text-foreground">
+            <ImageIcon className="h-4 w-4" />
+            {t("Upload Images", "رفع صور")}
+            <input type="file" accept="image/*" multiple className="hidden" onChange={handleImageUpload} />
+          </label>
+
+          {form.images.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {form.images.map((src, i) => (
+                <div key={i} className="relative group w-20 h-16 rounded-lg overflow-hidden border border-border">
+                  <img src={src} alt="" className="w-full h-full object-cover" />
+                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
+                    {i > 0 && (
+                      <button onClick={() => moveImage(i, i - 1)}
+                        className="w-5 h-5 rounded bg-white/20 hover:bg-white/40 flex items-center justify-center text-white"
+                        title={t("Move left","تقديم")}>
+                        <ChevronLeft className="h-3 w-3" />
+                      </button>
+                    )}
+                    <button onClick={() => removeImage(i)}
+                      className="w-5 h-5 rounded bg-red-500/80 hover:bg-red-500 flex items-center justify-center text-white"
+                      title={t("Remove","حذف")}>
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                    {i < form.images.length - 1 && (
+                      <button onClick={() => moveImage(i, i + 1)}
+                        className="w-5 h-5 rounded bg-white/20 hover:bg-white/40 flex items-center justify-center text-white"
+                        title={t("Move right","تأخير")}>
+                        <ChevronRight className="h-3 w-3" />
+                      </button>
+                    )}
+                  </div>
+                  {i === 0 && (
+                    <div className="absolute bottom-0 left-0 right-0 text-center text-[9px] bg-primary/80 text-white py-0.5">
+                      {t("Main","رئيسية")}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+          <p className="text-xs text-muted-foreground">{t("First image is the thumbnail. Hover to reorder or delete.", "الصورة الأولى هي الصورة الرئيسية. مرّر للترتيب أو الحذف.")}</p>
+        </div>
+      </FormRow>
+
       <FormRow label={t("Card Color", "لون البطاقة")}>
         <div className="flex flex-wrap gap-2">
           {GRADIENTS.map(g => (
@@ -378,7 +454,7 @@ function ProjectsTab() {
           {projects.map(p => (
             <div key={p.id}>
               {editingId === p.id ? (
-                <ProjectForm t={t} initial={{ id: p.id, titleEn: p.titleEn, titleAr: p.titleAr, descEn: p.descEn, descAr: p.descAr, tags: p.tags.join(", "), link: p.link, gradient: p.gradient }}
+                <ProjectForm t={t} initial={{ id: p.id, titleEn: p.titleEn, titleAr: p.titleAr, descEn: p.descEn, descAr: p.descAr, tags: p.tags.join(", "), link: p.link, gradient: p.gradient, images: p.images ?? [] }}
                   onSave={handleSave} onCancel={() => setEditingId(null)} />
               ) : (
                 <div className="flex items-center gap-3 rounded-xl border border-border bg-card/60 p-4">
