@@ -40,24 +40,24 @@ export default function Navbar() {
               href="#"
               className="text-xl font-bold tracking-tighter text-foreground"
             >
-              Abdelrahman<span className="text-primary">.</span>
+              Abdelrahman
             </a>
           </div>
 
           {/* Desktop Nav */}
-          <nav className="hidden md:flex items-center space-x-8 rtl:space-x-reverse">
+          <nav className="hidden md:flex items-center gap-8">
             {navLinks.map((link) => (
               <a
                 key={link.href}
                 href={link.href}
-                className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
+                className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors whitespace-nowrap"
               >
                 {link.label}
               </a>
             ))}
           </nav>
 
-          <div className="hidden md:flex items-center space-x-4 rtl:space-x-reverse">
+          <div className="hidden md:flex items-center gap-2">
             <Button
               variant="ghost"
               size="icon"
