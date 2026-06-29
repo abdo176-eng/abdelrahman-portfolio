@@ -786,7 +786,7 @@ function SettingsTab() {
 ════════════════════════════════════════════════════════ */
 type Tab = "messages" | "projects" | "reviews" | "stats" | "settings";
 
-function Dashboard({ onLogout }: { onLogout: () => void }) {
+function Dashboard({ onLogout, onClose }: { onLogout: () => void; onClose: () => void }) {
   const { t } = useLanguage();
   const [tab, setTab] = useState<Tab>("messages");
 
@@ -800,16 +800,28 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-card shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center"><LayoutDashboard className="h-5 w-5 text-primary" /></div>
-          <div>
-            <h1 className="font-bold text-foreground text-lg leading-none">{t("Admin Panel","لوحة التحكم")}</h1>
-            <p className="text-xs text-muted-foreground mt-0.5">Abdelrahman Mohamed</p>
+      <div className="flex items-center gap-3 px-4 py-4 border-b border-border bg-card shrink-0">
+        {/* Close button — always on the left (entrance side of right panel) */}
+        <button onClick={onClose}
+          className="shrink-0 p-2 rounded-full bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground transition-colors">
+          <X className="h-4 w-4" />
+        </button>
+
+        {/* Title */}
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+            <LayoutDashboard className="h-5 w-5 text-primary" />
+          </div>
+          <div className="min-w-0">
+            <h1 className="font-bold text-foreground text-base leading-none truncate">{t("Admin Panel","لوحة التحكم")}</h1>
+            <p className="text-xs text-muted-foreground mt-0.5 truncate">Abdelrahman Mohamed</p>
           </div>
         </div>
-        <Button variant="ghost" size="sm" onClick={onLogout} className="gap-2 text-muted-foreground hover:text-foreground">
-          <LogOut className="h-4 w-4" /><span className="hidden sm:inline">{t("Sign Out","خروج")}</span>
+
+        {/* Logout */}
+        <Button variant="ghost" size="sm" onClick={onLogout} className="shrink-0 gap-1.5 text-muted-foreground hover:text-foreground">
+          <LogOut className="h-4 w-4" />
+          <span className="hidden sm:inline text-sm">{t("Sign Out","خروج")}</span>
         </Button>
       </div>
 
@@ -868,15 +880,19 @@ export default function AdminPanel({ open, onClose }: AdminPanelProps) {
           <div className="flex-1" onClick={onClose} />
           <motion.div initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }}
             transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            className="w-full max-w-2xl h-full bg-background border-l border-border shadow-2xl flex flex-col relative"
+            className="w-full max-w-2xl h-full bg-background border-l border-border shadow-2xl flex flex-col"
             onClick={e => e.stopPropagation()}>
-            <button onClick={onClose}
-              className="absolute top-4 right-4 rtl:left-4 rtl:right-auto z-10 p-2 rounded-full bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground transition-colors">
-              <X className="h-4 w-4" />
-            </button>
             {!loggedIn
-              ? <div className="flex-1 flex items-center justify-center p-8"><LoginForm onLogin={() => setLoggedIn(true)} /></div>
-              : <Dashboard onLogout={handleLogout} />
+              ? (
+                <div className="flex-1 flex items-center justify-center p-8 relative">
+                  <button onClick={onClose}
+                    className="absolute top-4 left-4 p-2 rounded-full bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground transition-colors">
+                    <X className="h-4 w-4" />
+                  </button>
+                  <LoginForm onLogin={() => setLoggedIn(true)} />
+                </div>
+              )
+              : <Dashboard onLogout={handleLogout} onClose={onClose} />
             }
           </motion.div>
         </motion.div>
