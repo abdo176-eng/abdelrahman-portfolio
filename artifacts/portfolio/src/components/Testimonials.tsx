@@ -22,7 +22,7 @@ function StarRating({ value, onChange }: { value: number; onChange?: (v: number)
           onMouseLeave={() => onChange && setHover(0)}
           className={onChange ? "cursor-pointer" : "cursor-default"}
         >
-          <Star className={`h-6 w-6 transition-colors ${star <= (hover || value) ? "fill-secondary text-secondary" : "text-muted-foreground/30"}`} />
+          <Star className={`h-6 w-6 transition-colors ${star <= (hover || value) ? "fill-violet-400 text-violet-400" : "text-muted-foreground/30"}`} />
         </button>
       ))}
     </div>
@@ -48,7 +48,7 @@ function ReviewCard({ review, idx }: { review: Review; idx: number }) {
           <p className="text-foreground/80 text-sm leading-relaxed mt-4 mb-8">{review.text}</p>
           <div className="flex items-center gap-4">
             <Avatar className="h-12 w-12 border border-border">
-              <AvatarFallback className="bg-primary/10 text-primary font-bold">{initials}</AvatarFallback>
+              <AvatarFallback className="bg-violet-500/15 text-violet-400 font-bold">{initials}</AvatarFallback>
             </Avatar>
             <div>
               <p className="font-semibold text-foreground">{review.name}</p>
@@ -67,14 +67,14 @@ function PlaceholderCard({ idx, t }: { idx: number; t: (en: string, ar: string) 
       <Card className="h-full bg-background border-border border-dashed relative overflow-hidden opacity-50">
         <div className="absolute top-6 right-6 rtl:left-6 rtl:right-auto text-primary/10"><Quote className="h-12 w-12" /></div>
         <CardContent className="p-8 pt-10">
-          <div className="flex gap-1 mb-6">{[1,2,3,4,5].map(s => <Star key={s} className="h-5 w-5 fill-secondary text-secondary" />)}</div>
+          <div className="flex gap-1 mb-6">{[1,2,3,4,5].map(s => <Star key={s} className="h-5 w-5 fill-violet-400 text-violet-400" />)}</div>
           <div className="space-y-3 mb-8">
             <div className="h-4 w-full rounded bg-muted/60" />
             <div className="h-4 w-5/6 rounded bg-muted/60" />
             <div className="h-4 w-4/6 rounded bg-muted/60" />
           </div>
           <div className="flex items-center gap-4">
-            <Avatar className="h-12 w-12 border border-border"><AvatarFallback className="bg-primary/10 text-primary font-bold">{t("CL","عم")}</AvatarFallback></Avatar>
+            <Avatar className="h-12 w-12 border border-border"><AvatarFallback className="bg-violet-500/15 text-violet-400 font-bold">{t("CL","عم")}</AvatarFallback></Avatar>
             <div><div className="h-4 w-24 rounded bg-muted mb-2" /><div className="h-3 w-16 rounded bg-muted/60" /></div>
           </div>
         </CardContent>
@@ -187,7 +187,7 @@ export default function Testimonials() {
               {t("Review submitted — pending approval.", "تم إرسال التقييم — في انتظار الموافقة.")}
             </div>
           ) : (
-            <Button variant="outline" className="gap-2" onClick={() => setShowForm(true)}>
+            <Button variant="outline" className="gap-2 border-violet-500/40 text-violet-400 hover:bg-violet-500 hover:text-white hover:border-violet-500 transition-all duration-300" onClick={() => setShowForm(true)}>
               <PenLine className="h-4 w-4" />
               {t("Write a Review", "اكتب تقييمك")}
             </Button>

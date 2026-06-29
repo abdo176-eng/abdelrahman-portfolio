@@ -37,9 +37,9 @@ export default function WhyChooseMe() {
               whileInView={{ opacity: 1, scale: 1 }}
               viewport={{ once: true }}
               transition={{ delay: idx * 0.05 }}
-              className="flex flex-col items-center p-6 rounded-2xl bg-card border border-border/50 hover:border-primary/30 transition-colors text-center"
+              className="flex flex-col items-center p-6 rounded-2xl bg-card border border-border/50 hover:border-violet-500/50 transition-all duration-300 text-center"
             >
-              <div className="h-12 w-12 rounded-full bg-primary/10 text-primary flex items-center justify-center mb-4">
+              <div className="h-12 w-12 rounded-full bg-violet-500/10 text-violet-400 flex items-center justify-center mb-4">
                 <reason.icon className="h-6 w-6" />
               </div>
               <h3 className="font-semibold text-foreground">{reason.title}</h3>

@@ -203,7 +203,7 @@ function ProjectCard({
   return (
     <Card
       onClick={onClick}
-      className="overflow-hidden h-full flex flex-col group hover:shadow-xl transition-all duration-300 border-border bg-card cursor-pointer hover:-translate-y-1"
+      className="overflow-hidden h-full flex flex-col group hover:shadow-xl transition-all duration-300 border-border hover:border-violet-500/50 bg-card cursor-pointer hover:-translate-y-1"
     >
       {/* Thumbnail / gradient */}
       <div className={`relative aspect-video overflow-hidden ${thumb ? "" : `bg-gradient-to-br ${gradient}`}`}>

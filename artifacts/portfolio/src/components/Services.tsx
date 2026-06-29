@@ -51,9 +51,9 @@ export default function Services() {
               viewport={{ once: true }}
               transition={{ delay: idx * 0.1 }}
             >
-              <Card className="h-full bg-background hover:border-primary/50 transition-colors">
+              <Card className="h-full bg-background transition-all duration-300 hover:border-violet-500/50">
                 <CardContent className="p-6">
-                  <div className="h-14 w-14 rounded-xl bg-primary/10 text-primary flex items-center justify-center mb-6">
+                  <div className="h-14 w-14 rounded-xl bg-violet-500/10 text-violet-400 flex items-center justify-center mb-6">
                     <service.icon className="h-7 w-7" />
                   </div>
                   <h3 className="text-xl font-bold mb-3">{service.title}</h3>
@@ -70,8 +70,8 @@ export default function Services() {
           viewport={{ once: true }}
           className="max-w-2xl mx-auto"
         >
-          <div className="rounded-2xl bg-gradient-to-r from-secondary/10 via-primary/5 to-secondary/10 border border-secondary/20 p-8 flex items-center gap-6">
-            <div className="h-16 w-16 shrink-0 rounded-full bg-secondary/20 text-secondary flex items-center justify-center hidden sm:flex">
+          <div className="rounded-2xl bg-gradient-to-r from-violet-500/10 via-violet-500/5 to-violet-500/10 border border-violet-500/20 p-8 flex items-center gap-6">
+            <div className="h-16 w-16 shrink-0 rounded-full bg-violet-500/20 text-violet-400 flex items-center justify-center hidden sm:flex">
               <LineChart className="h-8 w-8" />
             </div>
             <div>

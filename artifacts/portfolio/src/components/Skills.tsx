@@ -65,14 +65,14 @@ export default function Skills() {
               viewport={{ once: true }}
               transition={{ delay: idx * 0.1 }}
             >
-              <Card className="h-full bg-background border-border shadow-sm">
+              <Card className="h-full bg-background border-border shadow-sm transition-all duration-300 hover:border-violet-500/50">
                 <CardHeader>
-                  <CardTitle className="text-xl text-center text-primary">{category.title}</CardTitle>
+                  <CardTitle className="text-xl text-center text-violet-400">{category.title}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-2 gap-4">
                     {category.skills.map((skill, sIdx) => (
-                      <div key={sIdx} className="flex flex-col items-center p-3 rounded-lg bg-card/50 border border-border/50 hover:border-primary/30 transition-colors">
+                      <div key={sIdx} className="flex flex-col items-center p-3 rounded-lg bg-card/50 border border-border/50 hover:border-violet-500/30 transition-all duration-300">
                         <skill.icon className={`h-8 w-8 mb-2 ${skill.color}`} />
                         <span className="text-sm font-medium text-foreground">{skill.name}</span>
                       </div>
